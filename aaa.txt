@@ -1,0 +1,140 @@
+3.1 MySQL 核心表设计（完整 DDL）
+以下是基于开发计划书的 MySQL 8.0 核心表 DDL 脚本，可直接在数据库中执行：
+用户表（user）
+CREATE TABLE `user` (
+  `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `username`    VARCHAR(50)  NOT NULL UNIQUE COMMENT '用户名',
+  `password_hash` VARCHAR(255) NOT NULL COMMENT 'BCrypt加密密码',
+  `phone`       VARCHAR(20)  DEFAULT NULL UNIQUE COMMENT '手机号',
+  `avatar_url`  VARCHAR(500) DEFAULT NULL COMMENT '头像URL',
+  `preference_json` JSON     DEFAULT NULL COMMENT '饮食偏好JSON',
+  `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态:1正常0禁用',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_phone` (`phone`),
+  INDEX `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
+菜谱表（recipe）
+CREATE TABLE `recipe` (
+  `id`             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `title`          VARCHAR(200) NOT NULL COMMENT '菜谱标题',
+  `description`    TEXT         DEFAULT NULL COMMENT '菜谱简介',
+  `difficulty`     TINYINT      NOT NULL DEFAULT 1 COMMENT '难度:1易2中3难',
+  `duration_min`   INT          DEFAULT NULL COMMENT '烹饪时长(分钟)',
+  `cover_url`      VARCHAR(500) DEFAULT NULL COMMENT '封面图URL',
+  `author_id`      BIGINT UNSIGNED NOT NULL,
+  `like_count`     INT          NOT NULL DEFAULT 0,
+  `view_count`     INT          NOT NULL DEFAULT 0,
+  `status`         TINYINT      NOT NULL DEFAULT 1 COMMENT '状态:1正常0下架',
+  `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_author` (`author_id`),
+  INDEX `idx_created` (`created_at`),
+  FULLTEXT INDEX `ft_search` (`title`, `description`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='菜谱表';
+菜谱食材关联表（recipe_ingredient）
+CREATE TABLE `recipe_ingredient` (
+  `id`            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `recipe_id`     BIGINT UNSIGNED NOT NULL,
+  `ingredient_id` BIGINT UNSIGNED NOT NULL,
+  `type`          ENUM('main','aux') NOT NULL DEFAULT 'main' COMMENT '类型:main主料aux辅料',
+  `amount`        DECIMAL(8,2)   DEFAULT NULL COMMENT '用量',
+  `unit`          VARCHAR(20)    DEFAULT NULL COMMENT '单位(g/ml/个/勺)',
+  UNIQUE KEY `uk_recipe_ingredient` (`recipe_id`, `ingredient_id`),
+  INDEX `idx_ingredient` (`ingredient_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='菜谱食材关联表';
+菜谱步骤表（recipe_step）
+CREATE TABLE `recipe_step` (
+  `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `recipe_id`   BIGINT UNSIGNED NOT NULL,
+  `step_no`     INT NOT NULL COMMENT '步骤序号',
+  `content`     TEXT NOT NULL COMMENT '步骤内容',
+  `image_url`   VARCHAR(500) DEFAULT NULL COMMENT '步骤配图URL',
+  `duration_sec` INT         DEFAULT NULL COMMENT '步骤耗时(秒)',
+  `tip`         VARCHAR(200) DEFAULT NULL COMMENT '小贴士',
+  INDEX `idx_recipe` (`recipe_id`, `step_no`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='菜谱步骤表';
+论坛帖子表（post）
+CREATE TABLE `post` (
+  `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `recipe_id`   BIGINT UNSIGNED DEFAULT NULL COMMENT '关联菜谱ID',
+  `section_id`  BIGINT UNSIGNED DEFAULT NULL COMMENT '版块ID',
+  `author_id`   BIGINT UNSIGNED NOT NULL,
+  `title`       VARCHAR(200) NOT NULL,
+  `content`     LONGTEXT NOT NULL COMMENT '富文本内容',
+  `like_count`  INT NOT NULL DEFAULT 0,
+  `comment_count` INT NOT NULL DEFAULT 0,
+  `view_count`  INT NOT NULL DEFAULT 0,
+  `status`      TINYINT NOT NULL DEFAULT 1,
+  `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_author` (`author_id`),
+  INDEX `idx_section` (`section_id`),
+  FULLTEXT INDEX `ft_search` (`title`, `content`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='论坛帖子表';
+评论表（comment）
+CREATE TABLE `comment` (
+  `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `post_id`     BIGINT UNSIGNED NOT NULL,
+  `parent_id`   BIGINT UNSIGNED DEFAULT NULL COMMENT '父评论ID(回复评论)',
+  `author_id`   BIGINT UNSIGNED NOT NULL,
+  `content`     VARCHAR(1000) NOT NULL,
+  `like_count`  INT NOT NULL DEFAULT 0,
+  `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_post` (`post_id`),
+  INDEX `idx_author` (`author_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='评论表';
+收藏表（favorite）
+CREATE TABLE `favorite` (
+  `id`            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `user_id`       BIGINT UNSIGNED NOT NULL,
+  `target_id`     BIGINT UNSIGNED NOT NULL,
+  `target_type`   ENUM('recipe','post') NOT NULL,
+  `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_user_target` (`user_id`, `target_id`, `target_type`),
+  INDEX `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='收藏表';
+评分表（rating）
+CREATE TABLE `rating` (
+  `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `user_id`     BIGINT UNSIGNED NOT NULL,
+  `recipe_id`   BIGINT UNSIGNED NOT NULL,
+  `score`       TINYINT NOT NULL COMMENT '评分1-5',
+  `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_user_recipe` (`user_id`, `recipe_id`),
+  INDEX `idx_recipe` (`recipe_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='评分表';
+3.2 Neo4j 图模型设计
+知识图谱是系统的核心卖点，建议使用 Neo4j 5.x 原生图数据库。以下是图模型设计：
+节点标签（Labels）
+标签	属性	说明
+Ingredient	name, category, nutrition(JSON), image_url	食材节点
+Recipe	name, difficulty, duration_min	菜谱节点
+User	id, name, preference(JSON)	用户节点
+关系类型（Relationship Types）
+关系	方向	属性	说明
+PAIRS_WITH	双向	freq: Int	食材常搭配频率
+CONFLICTS_WITH	双向	reason: String	食材相克原因
+SUBSTITUTE_FOR	单向	—	食材替代关系
+USES	Recipe → Ingredient	role: String (main/aux)	菜谱使用的食材
+LIKES	User → Recipe	score: Int	用户评分
+Cypher 创建约束与索引
+-- 创建唯一约束
+CREATE CONSTRAINT ingredient_name_unique FOR (n:Ingredient) REQUIRE n.name IS UNIQUE;
+CREATE CONSTRAINT recipe_name_unique FOR (n:Recipe) REQUIRE n.name IS UNIQUE;
+
+-- 创建索引
+CREATE INDEX user_id_index FOR (n:User) ON (n.id);
+示例数据录入
+-- 创建食材节点
+CREATE (tomato:Ingredient {name: '番茄', category: '蔬菜', nutrition: '{"vitaminC": "高", "calories": 18}'});
+CREATE (egg:Ingredient {name: '鸡蛋', category: '蛋白质', nutrition: '{"protein": "高", "calories": 147}'});
+CREATE (green_onion:Ingredient {name: '葱', category: '调料', nutrition: '{"calories": 32}'});
+
+-- 创建关系
+CREATE (tomato)-[:PAIRS_WITH {freq: 95}]->(egg);
+CREATE (egg)-[:PAIRS_WITH {freq: 95}]->(tomato);
+CREATE (tomato)-[:CONFLICTS_WITH {reason: '酸性食材与高蛋白搭配影响消化'}]->(milk);
+CREATE (recipe:Recipe {name: '番茄炒蛋', difficulty: 1, duration_min: 10});
+CREATE (recipe)-[:USES {role: 'main'}]->(tomato);
+CREATE (recipe)-[:USES {role: 'main'}]->(egg);
+CREATE (recipe)-[:USES {role: 'aux'}]->(green_onion);
