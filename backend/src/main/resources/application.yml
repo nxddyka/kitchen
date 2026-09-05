@@ -1,0 +1,66 @@
+# =====================================================================================
+# 智能厨房辅助系统 · 后端配置
+# =====================================================================================
+server:
+  port: 8080
+  servlet:
+    context-path: /kitchen
+
+spring:
+  application:
+    name: kitchen-backend
+
+  # 数据源配置
+  datasource:
+    url: jdbc:mysql://localhost:3306/kitchen_db?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: kitjek
+    password: Wyx.159357
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # 启动时自动执行建表脚本
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      continue-on-error: false
+
+  # Jackson 配置
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# Knife4j 配置（Swagger 增强 UI + 基础认证保护文档）
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+  # 文档基础认证：访问 Knife4j 文档页面需输入用户名密码
+  basic:
+    enable: true
+    username: admin
+    password: admin123
+
+# JWT 配置
+jwt:
+  secret: ZmFudGFzdGlja2l0Y2hlbmRlc2hhY2hhZG1pbmt0Y2hlbmRlc2hhY2hhZG1pbkt0Y2hlbmRlc2hhY2hhZG1pbg==
+  expiration: 7200000       # 2小时（毫秒）
+  refresh-expiration: 604800000  # 7天（毫秒）
+
+# 日志配置
+logging:
+  level:
+    com.kitchen: debug
+    org.springframework.security: info

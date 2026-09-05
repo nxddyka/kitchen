@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>食材库 · 智能厨房辅助系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/theme.css">
+</head>
+<body>
+
+<!-- 导航栏 -->
+<div id="navbar"></div>
+
+<!-- 主内容区（80% 页宽） -->
+<div class="container-main" style="max-width: 80%; margin: 30px auto;">
+    <div class="messages-container" id="messagesContainer"></div>
+
+    <h3 class="page-header">
+        <i class="fas fa-carrot me-2"></i>食材库
+    </h3>
+
+    <!-- 搜索与筛选栏 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label">关键词搜索</label>
+                    <input type="text" class="form-control" id="keywordInput"
+                           placeholder="输入食材名称..." value="">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">分类筛选</label>
+                    <select class="form-control" id="categorySelect">
+                        <option value="">全部分类</option>
+                        <option value="蔬菜">蔬菜</option>
+                        <option value="水果">水果</option>
+                        <option value="肉类">肉类</option>
+                        <option value="调料">调料</option>
+                        <option value="蛋白质">蛋白质</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button class="btn btn-primary flex-fill" onclick="loadIngredients(1)">
+                        <i class="fas fa-search me-1"></i>搜索
+                    </button>
+                    <button class="btn btn-secondary flex-fill" onclick="resetFilters()">
+                        <i class="fas fa-redo me-1"></i>重置
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 食材卡片网格（一行3个，1:2比例） -->
+    <div id="ingredientGrid" class="ingredient-grid">
+        <!-- 加载占位 -->
+        <div class="text-center py-5" style="grid-column: 1 / -1;">
+            <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
+            <p class="mt-3 text-secondary">加载中...</p>
+        </div>
+    </div>
+
+    <!-- 分页 -->
+    <nav class="mt-4 d-none" id="paginationNav">
+        <ul class="pagination justify-content-center" id="pagination"></ul>
+    </nav>
+</div>
+
+<!-- 页脚 -->
+<div id="footer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+// 渲染导航栏和页脚
+document.getElementById('navbar').innerHTML = renderNavbar('ingredients');
+document.getElementById('footer').innerHTML = renderFooter();
+
+// 检查登录状态
+Auth.requireLogin();
+
+let currentPage = 1;
+let totalPages = 1;
+
+// 加载食材列表
+async function loadIngredients(page = 1) {
+    currentPage = page;
+    const keyword = document.getElementById('keywordInput').value.trim();
+    const category = document.getElementById('categorySelect').value;
+    const grid = document.getElementById('ingredientGrid');
+
+    grid.innerHTML = `
+        <div class="text-center py-5" style="grid-column: 1 / -1;">
+            <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
+            <p class="mt-3 text-secondary">加载中...</p>
+        </div>`;
+
+    const result = await Api.get('/ingredients', {
+        page: page,
+        size: 12,
+        keyword: keyword || undefined,
+        category: category || undefined
+    });
+
+    if (!result || result.code !== 200) {
+        grid.innerHTML = `<div class="text-center py-5" style="grid-column: 1 / -1;">
+            <i class="fas fa-exclamation-circle fa-2x text-danger"></i>
+            <p class="mt-3 text-secondary">加载失败，请稍后重试</p>
+        </div>`;
+        return;
+    }
+
+    const pageData = result.data;
+    const records = pageData.records || [];
+    totalPages = pageData.pages || 1;
+
+    if (records.length === 0) {
+        grid.innerHTML = `<div class="text-center py-5" style="grid-column: 1 / -1;">
+            <i class="fas fa-box-open fa-3x text-secondary opacity-50"></i>
+            <p class="mt-3 text-secondary">暂无食材数据</p>
+        </div>`;
+        document.getElementById('paginationNav').classList.add('d-none');
+        return;
+    }
+
+    // 渲染卡片（一行3个，1:2 比例）
+    grid.innerHTML = records.map(item => `
+        <div class="ingredient-card" onclick="showDetail(${item.id})">
+            <div class="ingredient-card-img">
+                ${item.imageUrl
+                    ? `<img src="${Utils.escapeHtml(item.imageUrl)}" alt="${Utils.escapeHtml(item.name)}">`
+                    : `<i class="fas fa-leaf ingredient-card-img-placeholder"></i>`
+                }
+            </div>
+            <div class="ingredient-card-body">
+                <div class="ingredient-card-title">${Utils.escapeHtml(item.name)}</div>
+                <div class="ingredient-card-meta">
+                    <span class="badge bg-primary">${Utils.escapeHtml(item.category || '未分类')}</span>
+                    ${item.season ? `<span class="badge bg-success">${Utils.escapeHtml(item.season)}</span>` : ''}
+                    ${item.taste ? `<span class="badge bg-warning">${Utils.escapeHtml(item.taste)}</span>` : ''}
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    // 渲染分页
+    renderPagination(pageData);
+}
+
+// 渲染分页
+function renderPagination(pageData) {
+    const nav = document.getElementById('paginationNav');
+    const ul = document.getElementById('pagination');
+
+    if (pageData.pages <= 1) {
+        nav.classList.add('d-none');
+        return;
+    }
+
+    nav.classList.remove('d-none');
+    let html = '';
+
+    // 上一页
+    if (pageData.current > 1) {
+        html += `<li class="page-item"><a class="page-link" href="javascript:loadIngredients(${pageData.current - 1})">上一页</a></li>`;
+    }
+
+    // 页码
+    for (let i = 1; i <= pageData.pages; i++) {
+        html += `<li class="page-item ${i === pageData.current ? 'active' : ''}">
+            <a class="page-link" href="javascript:loadIngredients(${i})">${i}</a>
+        </li>`;
+    }
+
+    // 下一页
+    if (pageData.current < pageData.pages) {
+        html += `<li class="page-item"><a class="page-link" href="javascript:loadIngredients(${pageData.current + 1})">下一页</a></li>`;
+    }
+
+    ul.innerHTML = html;
+}
+
+// 显示食材详情
+async function showDetail(id) {
+    ModalManager.open({
+        title: '食材详情',
+        body: '<div class="text-center"><i class="fas fa-spinner fa-spin fa-2x text-primary"></i><p class="mt-3 text-secondary">加载中...</p></div>',
+        showCancel: false,
+        confirmText: '关闭'
+    });
+
+    const result = await Api.get('/ingredients/' + id);
+    if (!result || result.code !== 200) {
+        ModalManager.open({
+            title: '食材详情',
+            body: '<p class="text-danger">加载失败</p>',
+            showCancel: false,
+            confirmText: '关闭'
+        });
+        return;
+    }
+
+    const item = result.data;
+    ModalManager.open({
+        title: item.name || '食材详情',
+        body: `
+            <div class="text-center mb-3">
+                ${item.imageUrl
+                    ? `<img src="${Utils.escapeHtml(item.imageUrl)}" style="max-width:200px;max-height:200px;border-radius:10px;">`
+                    : `<div class="avatar-default-lg mx-auto" style="width:80px;height:80px;font-size:2rem;"><i class="fas fa-leaf"></i></div>`
+                }
+            </div>
+            <table class="table table-borderless">
+                <tr><td style="width:100px;" class="text-secondary">分类</td><td>${Utils.escapeHtml(item.category || '-')}</td></tr>
+                <tr><td class="text-secondary">性味</td><td>${Utils.escapeHtml(item.taste || '-')}</td></tr>
+                <tr><td class="text-secondary">应季</td><td>${Utils.escapeHtml(item.season || '-')}</td></tr>
+                <tr><td class="text-secondary">简介</td><td>${Utils.escapeHtml(item.description || '-')}</td></tr>
+            </table>
+        `,
+        showCancel: false,
+        confirmText: '关闭'
+    });
+}
+
+// 重置筛选
+function resetFilters() {
+    document.getElementById('keywordInput').value = '';
+    document.getElementById('categorySelect').value = '';
+    loadIngredients(1);
+}
+
+// 回车搜索
+document.getElementById('keywordInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') loadIngredients(1);
+});
+
+// 初始加载
+loadIngredients(1);
+</script>
+</body>
+</html>

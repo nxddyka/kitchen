@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心 · 智能厨房辅助系统</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/theme.css">
+</head>
+<body>
+
+<!-- 导航栏 -->
+<div id="navbar"></div>
+
+<!-- 个人中心主内容 -->
+<div class="profile-container">
+    <div class="messages-container" id="messagesContainer"></div>
+
+    <!-- 用户信息卡片 -->
+    <div class="card mb-4">
+        <div class="profile-card">
+            <div class="profile-header">
+                <div class="avatar-section">
+                    <div class="avatar-wrapper">
+                        <div class="avatar-default-lg" id="userAvatar">U</div>
+                    </div>
+                </div>
+                <div class="profile-info">
+                    <div class="username-row">
+                        <span class="username" id="usernameDisplay">用户名</span>
+                        <a href="javascript:editUsername()" class="edit-btn">
+                            <i class="fas fa-edit text-primary"></i>
+                        </a>
+                        <span class="badge bg-primary" id="roleBadge" style="display:none;">管理员</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">手机号：</span>
+                        <span class="value" id="phoneDisplay">未设置</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">邮箱：</span>
+                        <span class="value" id="emailDisplay">未设置</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">注册时间：</span>
+                        <span class="value" id="createdAtDisplay">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">最后登录：</span>
+                        <span class="value" id="lastLoginDisplay">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 我的功能 -->
+    <div class="card mb-4">
+        <div class="profile-card">
+            <h5 style="margin-bottom: 15px; color: var(--primary-dark);">
+                <i class="fas fa-th-large me-2"></i>我的功能
+            </h5>
+            <div class="function-row">
+                <a href="javascript:showHistory()" class="function-btn">
+                    <i class="fas fa-history"></i><span>浏览历史</span>
+                </a>
+                <a href="javascript:showFavorites()" class="function-btn">
+                    <i class="fas fa-bookmark"></i><span>我的收藏</span>
+                </a>
+                <a href="forum" class="function-btn">
+                    <i class="fas fa-file-alt"></i><span>我的发帖</span>
+                </a>
+                <a href="javascript:showComments()" class="function-btn">
+                    <i class="fas fa-comments"></i><span>我的评论</span>
+                </a>
+                <a href="javascript:showSettings()" class="function-btn">
+                    <i class="fas fa-cog"></i><span>个人设置</span>
+                </a>
+            </div>
+
+            <!-- 管理员专属功能 -->
+            <div id="adminSection" style="display:none;">
+                <h5 style="margin: 20px 0 15px; color: #E65100;">
+                    <i class="fas fa-shield-alt me-2"></i>管理员功能
+                </h5>
+                <div class="function-row">
+                    <a href="javascript:showUserManagement()" class="function-btn admin-btn">
+                        <i class="fas fa-users-cog"></i><span>用户管理</span>
+                    </a>
+                    <a href="http://localhost:8080/kitchen/doc.html" target="_blank" class="function-btn admin-btn">
+                        <i class="fas fa-code"></i><span>API文档</span>
+                    </a>
+                    <a href="javascript:showContentManagement()" class="function-btn admin-btn">
+                        <i class="fas fa-tasks"></i><span>内容审核</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部操作 -->
+    <div class="card">
+        <div class="profile-card">
+            <div class="bottom-row">
+                <a href="login" class="bottom-btn switch-btn">
+                    <i class="fas fa-user-circle"></i><span>切换账号</span>
+                </a>
+                <button class="bottom-btn logout-btn" style="flex:2;" onclick="confirmLogout()">
+                    <i class="fas fa-sign-out-alt"></i><span>退出登录</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 页脚 -->
+<div id="footer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+document.getElementById('navbar').innerHTML = renderNavbar('profile');
+document.getElementById('footer').innerHTML = renderFooter();
+
+// 检查登录状态
+if (!Auth.requireLogin()) {
+    // requireLogin 会自动跳转，这里不需要继续
+} else {
+    loadUserProfile();
+}
+
+// 加载用户信息
+async function loadUserProfile() {
+    const user = Auth.getUser();
+    if (!user) return;
+
+    // 先用本地存储的数据填充
+    fillUserInfo(user);
+
+    // 从后端拉取最新信息
+    const result = await Api.get('/auth/' + user.id);
+    // 如果后端没有这个接口，就只用本地数据
+    // 暂时用本地数据兜底
+    if (!result || result.code !== 200) {
+        // 使用本地数据即可
+        return;
+    }
+}
+
+function fillUserInfo(user) {
+    document.getElementById('usernameDisplay').textContent = user.username || '用户';
+    document.getElementById('userAvatar').textContent = Utils.getInitial(user.username);
+
+    document.getElementById('phoneDisplay').textContent = user.phone || '未设置';
+    document.getElementById('emailDisplay').textContent = user.email || '未设置';
+    document.getElementById('createdAtDisplay').textContent = Utils.formatTime(user.createdAt) || '-';
+    document.getElementById('lastLoginDisplay').textContent = Utils.formatTime(user.lastLoginAt) || '-';
+
+    // 管理员显示专属功能
+    if (Auth.isAdmin()) {
+        document.getElementById('roleBadge').style.display = '';
+        document.getElementById('roleBadge').textContent = '管理员';
+        document.getElementById('adminSection').style.display = '';
+    } else if (user.role === 1) {
+        document.getElementById('roleBadge').style.display = '';
+        document.getElementById('roleBadge').textContent = '版主';
+    }
+}
+
+function editUsername() {
+    ModalManager.open({
+        title: '修改用户名',
+        body: `
+            <div class="mb-3">
+                <label class="form-label">新用户名</label>
+                <input type="text" class="form-control" id="newUsername" value="${Utils.escapeHtml(Auth.getUsername())}" maxlength="50">
+            </div>
+        `,
+        confirmText: '保存',
+        onConfirm: () => {
+            ToastManager.info('修改用户名功能开发中');
+        }
+    });
+}
+
+function showHistory() {
+    ModalManager.alert('浏览历史', '<p class="text-secondary">浏览历史功能开发中，敬请期待</p>');
+}
+
+function showFavorites() {
+    ModalManager.alert('我的收藏', '<p class="text-secondary">收藏功能开发中，敬请期待</p>');
+}
+
+function showComments() {
+    ModalManager.alert('我的评论', '<p class="text-secondary">评论管理功能开发中，敬请期待</p>');
+}
+
+function showSettings() {
+    ModalManager.open({
+        title: '个人设置',
+        body: `
+            <div class="mb-3">
+                <label class="form-label">手机号</label>
+                <input type="text" class="form-control" placeholder="请输入手机号">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">邮箱</label>
+                <input type="email" class="form-control" placeholder="请输入邮箱">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">饮食偏好</label>
+                <select class="form-control">
+                    <option value="">请选择</option>
+                    <option>清淡</option>
+                    <option>偏辣</option>
+                    <option>偏甜</option>
+                    <option>偏咸</option>
+                </select>
+            </div>
+        `,
+        confirmText: '保存',
+        onConfirm: () => {
+            ToastManager.info('设置保存功能开发中');
+        }
+    });
+}
+
+function showUserManagement() {
+    ModalManager.open({
+        title: '用户管理',
+        body: `
+            <div class="text-center py-3">
+                <i class="fas fa-users-cog fa-3x text-warning opacity-50"></i>
+                <p class="mt-3 text-secondary">用户管理功能开发中</p>
+                <p class="text-secondary"><small>可通过 API 文档调用 /admin/users 接口</small></p>
+            </div>
+        `,
+        showCancel: false,
+        confirmText: '关闭'
+    });
+}
+
+function showContentManagement() {
+    ModalManager.alert('内容审核', '<p class="text-secondary">内容审核功能开发中，敬请期待</p>');
+}
+
+function confirmLogout() {
+    ModalManager.confirm({
+        title: '退出登录',
+        body: '确定要退出登录吗？',
+        confirmText: '退出',
+        onConfirm: () => {
+            Auth.logout();
+        }
+    });
+}
+</script>
+</body>
+</html>

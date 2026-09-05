@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="0">
+    <title>智能厨房辅助系统</title>
+</head>
+<body>
+<script>
+// 已登录 → 跳转食材库主页，未登录 → 跳转登录页
+const token = localStorage.getItem('kitchen_token');
+if (token) {
+    window.location.href = 'ingredients';
+} else {
+    window.location.href = 'login';
+}
+</script>
+</body>
+</html>
